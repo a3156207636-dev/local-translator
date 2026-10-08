@@ -327,34 +327,29 @@ class Wizard(tk.Tk):
 
     # ------------------------------------------------------------- license #
     def _refresh_license(self) -> None:
-        """按授权状态刷新：模型档位、开机自启开关、状态文案。"""
+        """按授权状态刷新：已激活显示商业授权状态；所有功能对免费版同样开放。"""
         pro = licmod.is_pro()
         if pro:
             st = licmod.load_state()
             who = st.get("email") or st.get("key", "")
             self.lic_state.configure(
-                text=f"Pro 已激活：{who}　（无限翻译 · 7B+ 大模型 · 开机自启已解锁）",
+                text=f"商业授权已激活：{who}　（全部功能 + 预编译便携版 + 优先支持）",
                 foreground="#0a6b3d")
         else:
             self.lic_state.configure(
-                text=(f"免费版：每日 {licmod.FREE_DAILY_LIMIT} 次翻译，只能用 3B 及以下的小模型，"
-                      f"不支持开机自启。\n已购买 Pro？把邮件里的许可证密钥粘到右边点「激活」。"
-                      f"购买地址：{licmod.PRODUCT_URL}"),
-                foreground="#8a5a00")
+                text=(f"本软件已以 AGPLv3 开源，所有功能（任意语言互译、7B+ 大模型、"
+                      f"无限次数、开机自启）对免费版全部开放。\n填入商业授权密钥会显示「已激活」"
+                      f"并享附加服务；不买也能用全部功能。购买：{licmod.PRODUCT_URL}"),
+                foreground="#2E7D32")
 
+        # 模型下拉框：开源后全部可选（不再区分 Free / Pro 模型列表）
         try:
-            self.cmb_model.configure(values=MODEL_CHOICES if pro else FREE_MODELS)
+            self.cmb_model.configure(values=MODEL_CHOICES)
         except Exception:
             pass
-        if not licmod.model_allowed(self.model.get()):
-            self.model.set(self.recommended if licmod.model_allowed(self.recommended)
-                           else FREE_MODELS[-1])
         try:
-            if pro:
-                self.chk_auto.configure(state="normal")
-            else:
-                self.want_auto.set(False)
-                self.chk_auto.configure(state="disabled")
+            # 开机自启：开源后对所有人均开放
+            self.chk_auto.configure(state="normal")
         except Exception:
             pass
 
@@ -364,22 +359,13 @@ class Wizard(tk.Tk):
             pass
 
     def _refresh_langpair(self) -> None:
-        """按档位刷新语言对下拉框：Free/Pro 锁中文→英文，Max 全开。"""
-        max_tier = licmod.is_max()
+        """开源版：下拉框始终为全部语言，可任意组合。"""
         code_to_disp = {c: d for c, d, _p in licmod.LANGUAGES}
         disp_list = [d for _c, d, _p in licmod.LANGUAGES]
-        if max_tier:
-            self.cmb_src.configure(values=disp_list, state="readonly")
-            self.cmb_tgt.configure(values=disp_list, state="readonly")
-            self.lang_hint.configure(
-                text="Max：可任意组合语言对（日→英、中→日、英→中等）")
-        else:
-            self.cmb_src.configure(values=[code_to_disp["zh"]], state="disabled")
-            self.cmb_tgt.configure(values=[code_to_disp["en"]], state="disabled")
-            self.src_var.set(code_to_disp["zh"])
-            self.tgt_var.set(code_to_disp["en"])
-            self.lang_hint.configure(
-                text="免费/Pro 固定为 中文→英文；Max 解锁任意语言互译")
+        self.cmb_src.configure(values=disp_list, state="readonly")
+        self.cmb_tgt.configure(values=disp_list, state="readonly")
+        self.lang_hint.configure(
+            text="开源版：任意语言对均可互译（日→英、中→日、英→中等）")
 
     def _do_activate(self) -> None:
         key = self.lic_key.get().strip()
@@ -523,12 +509,6 @@ class Wizard(tk.Tk):
             if not model:
                 messagebox.showwarning("提示", "先选一个模型。")
                 return
-            if not licmod.model_allowed(model):
-                messagebox.showwarning(
-                    "这个模型需要 Pro",
-                    licmod.model_message(model) + "\n\n"
-                    "免费版请换成 3B 及以下的小模型，或先在上面的「许可证」里激活 Pro。")
-                return
             eng.update({
                 "type": "openai",
                 "base_url": "http://127.0.0.1:11434/v1",
@@ -550,12 +530,9 @@ class Wizard(tk.Tk):
             })
             self.log(f"引擎 = 在线 API · {base} · {model}")
 
-        # 语言对：Free/Pro 强制中文→英文；Max 用界面所选
-        if licmod.is_max():
-            src = self._lang_code_by_display.get(self.src_var.get(), "zh")
-            tgt = self._lang_code_by_display.get(self.tgt_var.get(), "en")
-        else:
-            src, tgt = "zh", "en"
+        # 语言对：开源版直接用界面所选（任意语言对均可互译）
+        src = self._lang_code_by_display.get(self.src_var.get(), "zh")
+        tgt = self._lang_code_by_display.get(self.tgt_var.get(), "en")
         eng["source_lang"] = src
         eng["target_lang"] = tgt
         self.log(f"语言对 = {src} → {tgt}")
@@ -574,19 +551,12 @@ class Wizard(tk.Tk):
             except Exception as e:
                 self.log(f"× 快捷方式创建失败：{e}")
 
-        if self.want_auto.get() and not licmod.is_pro():
-            self.log("开机自启属于 Pro 功能，已跳过（免费版不支持）")
-            try:
-                cfg.setdefault("app", {})["autostart"] = False
-                cfgmod.save(cfg)
-            except Exception:
-                pass
-        else:
-            try:
-                ok, msg = portable_setup.autostart(self.want_auto.get())
-                self.log(("开机自启：" if ok else "开机自启设置失败：") + str(msg))
-            except Exception as e:
-                self.log(f"× 开机自启设置失败：{e}")
+        # 开源版：开机自启对所有人开放，按界面勾选执行
+        try:
+            ok, msg = portable_setup.autostart(self.want_auto.get())
+            self.log(("开机自启：" if ok else "开机自启设置失败：") + str(msg))
+        except Exception as e:
+            self.log(f"× 开机自启设置失败：{e}")
 
         self.log("配置完成 ✓")
         if launch:

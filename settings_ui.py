@@ -179,7 +179,7 @@ class SettingsWindow:
                                  wraplength=520, anchor="w")
         self.lic_hint.pack(fill="x", padx=12, pady=(4, 0))
 
-        self.lic_link = tk.Label(wrap, text="升级 Pro / 购买许可证 →",
+        self.lic_link = tk.Label(wrap, text="购买商业授权 / 支持开发 →",
                                  font=(self.font_family, 9, "underline"),
                                  bg="#EAF1FA", fg="#185FA5", cursor="hand2")
         self.lic_link.pack(anchor="w", padx=12, pady=(2, 10))
@@ -207,25 +207,23 @@ class SettingsWindow:
             self.lic_hint.configure(text=hint, fg="#2E7D32")
         else:
             self.lic_state.configure(
-                text=f"免费版 · 今日 {licmod.usage_today()}/{licmod.FREE_DAILY_LIMIT}",
-                fg="#B26A00")
+                text=f"免费版（开源 · 全部功能可用）· 今日已用 {licmod.usage_today()}",
+                fg="#2E7D32")
             self.lic_entry.configure(state="normal")
             self.lic_btn.configure(text="激活")
             if not hint:
-                hint = (f"免费版：每日 {licmod.FREE_DAILY_LIMIT} 次翻译，只能用 3B 及以下的小模型，"
-                        f"不支持开机自启。\n把购买后收到的密钥粘贴到上面 → 点「激活」即可解锁 Pro / Max。")
+                hint = (f"本软件已以 AGPLv3 开源，所有功能（任意语言互译、7B+ 大模型、"
+                        f"无限次数、开机自启）对免费版全部开放。\n若在设置里填入商业授权密钥，"
+                        f"会显示为「已激活」并享有预编译便携版与优先支持；不买也能用全部功能。")
             self.lic_hint.configure(text=hint, fg="#6B7680")
 
-        # 升级链接：免费→Pro，Pro→Max，已是 Max 则隐藏
-        if licmod.is_max():
-            self._lic_link_target = ""
-            self.lic_link.configure(text="")
-        elif licmod.is_pro():
-            self._lic_link_target = licmod.MAX_PRODUCT_URL
-            self.lic_link.configure(text="升级到 Max（任意语言互译）→")
+        # 商业授权 / 支持链接：已激活则展示「管理许可证」，否则引导购买商业授权
+        if licmod.is_pro():
+            self._lic_link_target = licmod.PRODUCT_URL
+            self.lic_link.configure(text="管理 / 续费商业授权 →")
         else:
             self._lic_link_target = licmod.PRODUCT_URL
-            self.lic_link.configure(text="升级 Pro / 购买许可证 →")
+            self.lic_link.configure(text="购买商业授权 / 支持开发 →")
 
     def _on_license_button(self) -> None:
         if licmod.is_pro():
@@ -283,7 +281,6 @@ class SettingsWindow:
         tk.Label(wrap, text="翻译语言对", font=(self.font_family, 10), bg="#F4F6F8",
                  fg="#3A434C", width=22, anchor="w").pack(side="left")
 
-        max_tier = licmod.is_max()
         code_to_disp = {c: d for c, d, _p in licmod.LANGUAGES}
         self._lang_code_by_display = {d: c for c, d, _p in licmod.LANGUAGES}
         disp_list = [d for _c, d, _p in licmod.LANGUAGES]
@@ -296,16 +293,11 @@ class SettingsWindow:
         row = tk.Frame(wrap, bg="#F4F6F8")
         row.pack(side="left")
 
+        # 开源版：所有语言均可任意组合，下拉框全部可选
         self.src_var = tk.StringVar(value=cur_src_d)
         self.tgt_var = tk.StringVar(value=cur_tgt_d)
-        if max_tier:
-            values = disp_list
-            state = "readonly"
-        else:
-            values = [code_to_disp["zh"], code_to_disp["en"]]
-            state = "disabled"
-            self.src_var.set(code_to_disp["zh"])
-            self.tgt_var.set(code_to_disp["en"])
+        values = disp_list
+        state = "readonly"
 
         cb_src = ttk.Combobox(row, textvariable=self.src_var, values=values,
                              width=16, state=state)
@@ -321,38 +313,21 @@ class SettingsWindow:
         self.vars["engine.target_lang"] = self.tgt_var
         self._langpair_widgets = (cb_src, cb_tgt)
 
-        self.lang_lock = tk.Label(wrap, text="", font=(self.font_family, 9),
-                                  bg="#F4F6F8", fg="#B26A00", wraplength=200)
+        self.lang_lock = tk.Label(wrap, text="开源版 · 任意语言对均可互译",
+                                  font=(self.font_family, 9),
+                                  bg="#F4F6F8", fg="#2E7D32", wraplength=200)
         self.lang_lock.pack(side="left", padx=(10, 0))
-        if not max_tier:
-            self.lang_lock.configure(
-                text=f"免费/Pro 固定为 中文→英文；任意语言互译是 Max 功能")
 
-        self._refresh_langpair_lock_link(max_tier, wrap)
-
-    def _refresh_langpair_lock_link(self, max_tier: bool, parent: tk.Misc) -> None:
-        if max_tier:
-            return
-        link = tk.Label(parent, text="升级 Max →", font=(self.font_family, 9, "underline"),
-                        bg="#F4F6F8", fg="#185FA5", cursor="hand2")
-        link.pack(side="left", padx=(2, 0))
-        link.bind("<Button-1>", lambda _e: webbrowser.open(licmod.MAX_PRODUCT_URL))
+        # 已无档位锁定，无需再放「升级」链接
 
     def _refresh_langpair(self) -> None:
-        """激活 Max 后把下拉框放开成全部语言。"""
-        max_tier = licmod.is_max()
+        """开源版：下拉框始终为全部语言。"""
         code_to_disp = {c: d for c, d, _p in licmod.LANGUAGES}
         cb_src, cb_tgt = self._langpair_widgets
-        if max_tier:
-            disp_list = [d for _c, d, _p in licmod.LANGUAGES]
-            cb_src.configure(values=disp_list, state="readonly")
-            cb_tgt.configure(values=disp_list, state="readonly")
-            self.lang_lock.configure(text="", fg="#6B7680")
-        else:
-            cb_src.configure(values=[code_to_disp["zh"]], state="disabled")
-            cb_tgt.configure(values=[code_to_disp["en"]], state="disabled")
-            self.src_var.set(code_to_disp["zh"])
-            self.tgt_var.set(code_to_disp["en"])
+        disp_list = [d for _c, d, _p in licmod.LANGUAGES]
+        cb_src.configure(values=disp_list, state="readonly")
+        cb_tgt.configure(values=disp_list, state="readonly")
+        self.lang_lock.configure(text="开源版 · 任意语言对均可互译", fg="#2E7D32")
 
     # ------------------------------------------------------------------ #
     def _collect(self) -> dict:

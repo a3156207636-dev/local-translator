@@ -21,11 +21,11 @@ AGPLv3 是强 copyleft 协议：如果你**修改并分发**本软件（尤其�
 
 ## 购买
 
-- Pro（订阅）: https://howler77886.gumroad.com/l/local-bilingual-translator-pro
-- **Max（任意语言对互译，订阅）**: https://howler77886.gumroad.com/l/local-bilingual-translator-max
+- Pro（商业授权 + 预编译便携包 + 优先支持）: https://howler77886.gumroad.com/l/local-bilingual-translator-pro
+- **Max（商业授权 · 团队 / 企业优先支持）**: https://howler77886.gumroad.com/l/local-bilingual-translator-max
 
-> 免费版（可 0 元起付）: https://howler77886.gumroad.com/l/local-bilingual-translator
-> 预编译便携包对所有档位通用，靠许可证密钥解锁对应权益；**同一份安装包，无需重装即可升级。**
+> 免费版（可 0 元起付，功能全开）: https://howler77886.gumroad.com/l/local-bilingual-translator
+> 所有档位下载同一份预编译便携包，功能完全一致；商业授权仅附带密钥标记、便携包与优先支持，**同一份安装包，无需重装即可升级。**
 
 ---
 

@@ -340,14 +340,15 @@ ollama pull seed-x:7b          # 字节，专用翻译模型
 AGPLv3 是强 copyleft：如果你**修改并分发**（含以网络服务形式提供），必须同样以 AGPLv3 开源你的修改。
 这对个人用户没有影响。
 
-**商业 / 闭源使用需要商业授权** —— 在 Gumroad 购买 Pro / Max 档位即视为获得商业授权，包含
-优先支持与预编译便携包。细则见 [`COMMERCIAL.md`](./COMMERCIAL.md)：
+**商业 / 闭源使用需要商业授权** —— 在 Gumroad 购买 Pro / Max 档位即视为获得商业授权。
+无论是否购买，开源版的**全部功能（任意语言互译、7B+ 大模型、无限次数、开机自启）都已开放**；
+密钥只用于在设置里标记「已激活」，并附带预编译便携包与优先支持等附加服务。细则见 [`COMMERCIAL.md`](./COMMERCIAL.md)：
 
-- 免费版（可 0 元起付）: https://howler77886.gumroad.com/l/local-bilingual-translator
-- Pro（订阅，解锁更强模型）: https://howler77886.gumroad.com/l/local-bilingual-translator-pro
-- **Max（任意语言对互译，订阅）**: https://howler77886.gumroad.com/l/local-bilingual-translator-max
+- 免费版（可 0 元起付，功能全开）: https://howler77886.gumroad.com/l/local-bilingual-translator
+- Pro（商业授权 + 预编译便携包 + 优先支持）: https://howler77886.gumroad.com/l/local-bilingual-translator-pro
+- **Max（商业授权 · 团队 / 企业优先支持）**: https://howler77886.gumroad.com/l/local-bilingual-translator-max
 
-> 三个档位用的是**同一份预编译便携包**，靠许可证密钥解锁对应权益，**升级无需重装**。
+> 所有档位下载的是**同一份预编译便携包**，功能完全一致；购买商业授权仅附带密钥标记、便携包与优先支持，**升级无需重装**。
 
 如果本项目对你有用，欢迎在 [GitHub Sponsors](https://github.com/sponsors/your-github-username)
 上赞助，或直接在上面的 Gumroad 页面付费支持 —— 这能让我持续维护与改进它。🙏

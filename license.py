@@ -5,10 +5,12 @@
   * 验证通过后结果缓存在本机，之后**离线也能正常使用**
   * 之后每 7 天在后台静默复查一次；订阅到期/退款/拒付会自动降回免费版
 
-三档权益：
-  Free  每天 100 次、3B 及以下模型、中文→English、不可开机自启
-  Pro   不限次数、7B/14B 及翻译专精模型、中文→English、可开机自启、商用授权
-  Max   Pro 的全部权益 + **任意语言对互译**（日→英、中→日、英→中等）
+开源后的授权说明（AGPLv3）：
+  本项目以 AGPLv3 协议开源，**所有翻译功能对所有人免费开放、不再做任何功能限制**——
+  任意语言对互译、7B+ 大模型、无限次数、开机自启，免费版即可用。
+  下面这套 license 机制现在只做一件事：登记「商业授权 / 优先级支持」状态。
+  在设置里填入 Gumroad Pro / Max 密钥的用户会显示为「已激活」，并享有预编译便携版、
+  优先答疑等附加服务；没买的也能用全部功能（这是「增值服务」而非「功能锁」）。
 """
 from __future__ import annotations
 
@@ -44,9 +46,9 @@ TIER_FREE = "free"
 TIER_PRO = "pro"
 TIER_MAX = "max"
 
-# --- 模型档位：Pro / Max 解锁「更聪明的本地大模型」 -------------------------- #
-# 免费版可用的上限约 3B 参数（核显也能跑）；7B 及以上的翻译质量明显更好。
-# 模型名里读不出参数量时（自定义模型）一律放行，避免误伤。
+# --- 模型档位（开源后已不再限制） ----------------------------------------- #
+# 历史遗留：曾经免费版仅放行 3B 及以下的小模型。开源后不再限制，任意本地/在线
+# 模型都可使用；保留常量仅为兼容旧调用与日志。
 FREE_MAX_PARAMS_B = 3.0
 
 # Pro 专属推荐模型（翻译质量更好，需要 6GB+ 显存）
@@ -57,8 +59,8 @@ PRO_MODEL_PRESETS: list[Tuple[str, str]] = [
     ("qwen2.5:14b-instruct-q4_K_M", "14B 高质量版，12GB+ 显存"),
 ]
 
-# --- 语言对：Max 解锁「任意语言互译」 --------------------------------------- #
-# Free / Pro 只允许这一组；Max 允许下面的任意组合（含源语言自动检测）。
+# --- 语言对（开源后已全开放） --------------------------------------------- #
+# 所有语言均可任意组合互译（含源语言自动检测）。
 # 每项 = (代码, 界面显示名, 给模型的英文说法)
 LANGUAGES: list[Tuple[str, str, str]] = [
     ("auto", "自动检测", "the language you detect"),
@@ -77,7 +79,7 @@ LANGUAGES: list[Tuple[str, str, str]] = [
     ("ar", "阿拉伯语 Arabic", "Arabic"),
 ]
 
-# 非 Max 档位唯一允许的语言对（源语言 → 目标语言）
+# 历史遗留：曾经非 Max 档位只允许这一组；开源后已不再限制，保留仅为兼容。
 FREE_LOCKED_PAIR = ("zh", "en")
 
 _lock = threading.RLock()
@@ -341,32 +343,24 @@ def usage_today() -> int:
 
 
 def remaining_today() -> Optional[int]:
-    """Pro 返回 None（不限量）。"""
-    if is_pro():
-        return None
-    return max(0, FREE_DAILY_LIMIT - usage_today())
+    """开源版不再限制翻译次数，始终返回 None（不限量）。保留以兼容旧调用。"""
+    return None
 
 
 def consume() -> Tuple[bool, int]:
-    """翻译前调用，记一次用量。返回 (是否放行, 今日已用)。"""
-    if is_pro():
-        return True, 0
+    """翻译前调用，记一次用量（仅用于展示，不再限制）。返回 (是否放行, 今日已用)。"""
     with _lock:
         d = _read_json(USAGE_PATH)
         if d.get("date") != _today():
             d = {"date": _today(), "count": 0}
-        c = int(d.get("count", 0))
-        if c >= FREE_DAILY_LIMIT:
-            return False, c
-        d["count"] = c + 1
+        c = int(d.get("count", 0)) + 1
+        d["count"] = c
         _write_json(USAGE_PATH, d)
-        return True, c + 1
+    return True, c
 
 
 def refund_one() -> None:
-    """翻译最终失败时把这一笔额度还回去。"""
-    if is_pro():
-        return
+    """翻译最终失败时把这一笔用量还回去（仅展示用，无上限限制）。"""
     with _lock:
         d = _read_json(USAGE_PATH)
         if d.get("date") != _today():
@@ -376,8 +370,9 @@ def refund_one() -> None:
 
 
 def quota_message() -> str:
-    return (f"今日免费额度已用完（{FREE_DAILY_LIMIT} 次/天）。\n"
-            f"升级 Pro 可无限使用、解锁 7B+ 大模型与开机自启：{PRODUCT_URL}")
+    # 开源后不再限制次数，此提示仅作兼容保留，正常流程不会触发。
+    return (f"翻译功能在开源版中不限次数。\n"
+            f"如需商业授权 / 优先级支持，可在此购买：{PRODUCT_URL}")
 
 
 # --------------------------------------------------------------------------- #
@@ -396,23 +391,14 @@ def _params_b(model: str) -> Optional[float]:
 
 
 def model_allowed(model: str) -> bool:
-    """免费版只放行 3B 及以下的小模型；Pro / Max 不限。"""
-    if is_pro():
-        return True
-    if not model:
-        return True
-    b = _params_b(model)
-    if b is None:
-        return True  # 自定义模型名读不出档位，不拦
-    return b <= FREE_MAX_PARAMS_B
+    """开源版不再限制模型大小，任意本地 / 在线模型均可使用，始终返回 True。"""
+    return True
 
 
 def model_message(model: str) -> str:
-    b = _params_b(model)
-    tag = f"{b:g}B" if b else "该"
-    return (f"「{model}」是 {tag} 大模型，属于 Pro 功能。\n"
-            f"免费版可使用 3B 及以下的小模型（如 qwen2.5:3b），"
-            f"或升级 Pro 解锁 7B+ 高质量模型：{PRODUCT_URL}")
+    # 开源后任意模型均可使用，此提示仅作兼容保留。
+    return (f"「{model}」可直接使用。\n"
+            f"如需商业授权 / 优先级支持，可在此购买：{PRODUCT_URL}")
 
 
 
@@ -434,30 +420,20 @@ def _lang_prompt(code: str) -> str:
 
 
 def available_pairs() -> list[Tuple[str, str]]:
-    """当前档位可选的语言对列表。"""
-    if is_max():
-        return [(c, d) for c, d, _p in LANGUAGES]
-    src, tgt = FREE_LOCKED_PAIR
-    return [(src, _lang_name(src)), (tgt, _lang_name(tgt))]
+    """开源版开放全部语言，返回所有可选语言对（任意互译）。"""
+    return [(c, d) for c, d, _p in LANGUAGES]
 
 
 def pair_allowed(src: str, tgt: str) -> bool:
-    """是否允许这个语言对进行翻译。
-
-    Max：任意组合。Free / Pro：仅「中文 → English」。
-    """
-    if is_max():
-        return True
-    return (src, tgt) == FREE_LOCKED_PAIR
+    """开源版开放任意语言对互译，始终允许。"""
+    return True
 
 
 def pair_message(src: str, tgt: str) -> str:
     s, t = _lang_name(src), _lang_name(tgt)
-    return (f"「{s} → {t}」属于 Max 功能。\n"
-            f"Pro / 免费版支持的是「{_lang_name(FREE_LOCKED_PAIR[0])} → "
-            f"{_lang_name(FREE_LOCKED_PAIR[1])}」。\n"
-            f"升级 Max 即可任意语言互译（日→英、中→日、英→中等 "
-            f"{len(LANGUAGES)} 种语言自由组合）：{MAX_PRODUCT_URL}")
+    # 开源后任意语言对均可互译，此提示仅作兼容保留。
+    return (f"「{s} → {t}」可直接互译。\n"
+            f"如需商业授权 / 优先级支持，可在此购买：{MAX_PRODUCT_URL}")
 
 
 def describe() -> str:
@@ -471,7 +447,7 @@ def describe() -> str:
         st = load_state()
         who = st.get("email") or st.get("key", "")
         return f"Pro 已激活（{who}）"
-    return f"免费版 · 今日已用 {usage_today()}/{FREE_DAILY_LIMIT}"
+    return f"免费版（开源 · 全部功能可用）· 今日已用 {usage_today()}"
 
 
 def status_line() -> str:

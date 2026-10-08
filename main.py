@@ -158,7 +158,6 @@ class App:
                 ("error", "没有连接到本机翻译服务", f"{base} 无响应。{hint}", None)
             )
             return
-        self._warn_model_tier()
         self._warmup()
 
     def _license_check(self) -> None:
@@ -170,18 +169,6 @@ class App:
             self.log.info("授权状态：%s", licmod.describe())
         except Exception as e:
             self.log.debug("许可证复查失败：%s", e)
-
-    def _warn_model_tier(self) -> None:
-        """免费版配了 7B+ 大模型时提前说明，别让用户以为是坏了。"""
-        model = str(self.cfg.get("engine", {}).get("model", "") or "")
-        if licmod.model_allowed(model):
-            return
-        self.log.info("当前模型 %s 高于免费版档位", model)
-        self.ui.post((
-            "error", "当前模型属于 Pro",
-            licmod.model_message(model) + "\n\n可在「设置 → 翻译引擎 → 模型名称」换成 qwen2.5:3b。",
-            None,
-        ))
 
     def _ensure_engine(self) -> None:
         """本机引擎没在跑就顺手拉起来，省得用户先手动开 Ollama。
@@ -234,12 +221,6 @@ class App:
     def _sync_autostart(self, silent: bool = False) -> None:
         """让注册表里的自启项与配置保持一致。"""
         want = bool(self.cfg.get("app", {}).get("autostart", False))
-        if want and not licmod.is_pro():
-            # 开机自启是 Pro 功能：免费版顺手关掉，别留半开状态
-            self.log.info("开机自启属于 Pro 功能，已自动关闭")
-            want = False
-            self.cfg.setdefault("app", {})["autostart"] = False
-            cfgmod.save(self.cfg)
         has = autostart_mod.is_enabled()
         if want and not has:
             ok, info = autostart_mod.set_autostart(want, int(
@@ -263,17 +244,7 @@ class App:
                 self.ui.post(("error", "设置开机自启失败", info, None))
 
     def set_autostart(self, on: bool) -> bool:
-        """由状态球菜单调用，立即生效并写回配置。"""
-        if on and not licmod.is_pro():
-            self.log.info("开机自启属于 Pro 功能，已拦截")
-            self.ui.post((
-                "error", "开机自启是 Pro 功能",
-                "免费版不支持开机自启。\n升级 Pro 后就能开机自动待命：\n"
-                + licmod.PRODUCT_URL,
-                None,
-            ))
-            self.ui.sync_autostart(autostart_mod.is_enabled())
-            return False
+        """由状态球菜单调用，立即生效并写回配置。开源版中开机自启对所有人开放。"""
         delay = int(self.cfg.get("app", {}).get("autostart_delay_s", 0))
         ok, info = autostart_mod.set_autostart(on, delay)
         self.cfg.setdefault("app", {})["autostart"] = bool(on if ok else not on)
@@ -437,37 +408,9 @@ class App:
                 return
             self._busy = True
 
-        # ① 语言对权限：Free / Pro 仅允许「中文 → English」，任意互译是 Max 功能
-        eng_cfg = self.cfg.get("engine", {})
-        slang = _norm_lang(eng_cfg.get("source_lang", "zh"))
-        tlang = _norm_lang(eng_cfg.get("target_lang", "en"))
-        if not licmod.pair_allowed(slang, tlang):
-            with self._lock:
-                self._busy = False
-            self.log.info("语言对 %s→%s 属于 Max 功能，已拦截", slang, tlang)
-            self.ui.post(("error", text, licmod.pair_message(slang, tlang), caret))
-            self.ui.post(("status", "需要 Max"))
-            return
-
-        # ② 免费版只能用 3B 及以下的小模型，7B+ 大模型是 Pro 功能
-        model = str(self.cfg.get("engine", {}).get("model", "") or "")
-        if not licmod.model_allowed(model):
-            with self._lock:
-                self._busy = False
-            self.log.info("模型 %s 属于 Pro 功能，已拦截", model)
-            self.ui.post(("error", text, licmod.model_message(model), caret))
-            self.ui.post(("status", "需要 Pro"))
-            return
-
-        # ② 免费版每日额度（Pro 不限）
-        allowed, used = licmod.consume()
-        if not allowed:
-            with self._lock:
-                self._busy = False
-            self.log.info("免费额度已用完（%d/%d）", used, licmod.FREE_DAILY_LIMIT)
-            self.ui.post(("error", text, licmod.quota_message(), caret))
-            self.ui.post(("status", "额度已用完"))
-            return
+        # 开源版已不做功能限制：语言对、模型大小、每日次数全部开放。
+        # 仍记一次用量（仅用于「今日已用」展示），随后直接翻译。
+        licmod.consume()
 
         self.ui.post(("pending", text, caret))
         self.ui.post(("status", "翻译中"))
@@ -615,15 +558,12 @@ def run_cli(args) -> int:
         if st.get("key"):
             print(f"KEY={st.get('key')}")
             print(f"EMAIL={st.get('email', '')}")
-        print(f"TODAY_USED={licmod.usage_today()}/{licmod.FREE_DAILY_LIMIT}")
+        print(f"TODAY_USED={licmod.usage_today()}")
         if st.get("invalid"):
             print(f"NOTE={st.get('last_error', 'license invalid')}")
         return 0
 
     if args.set_autostart:
-        if args.set_autostart == "on" and not licmod.is_pro():
-            print("AUTOSTART=FAILED 开机自启属于 Pro 功能")
-            return 1
         on = args.set_autostart == "on"
         delay = int(cfg.get("app", {}).get("autostart_delay_s", 0))
         ok, info = autostart_mod.set_autostart(on, delay)
