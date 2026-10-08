@@ -1,0 +1,12 @@
+# 统一换行符：仓库内一律以 LF 存储，检出时按平台处理
+* text=auto
+
+# 源码 / 文档用 LF（跨平台协作一致）
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+LICENSE text eol=lf
+
+# Windows 批处理保持 CRLF，否则中文控制台会乱码
+*.bat text eol=crlf

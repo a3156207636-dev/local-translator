@@ -1,0 +1,34 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# ---- 本地配置 / 授权缓存（含本机密钥，勿提交）----
+config.json
+license.json
+*.local.json
+
+# ---- 打包产物（便携版 zip + 展开目录，体积大且含裁剪运行时）----
+dist/
+*.zip
+
+# ---- 日志 / 运行产物 ----
+logs/
+*.log
+
+# ---- 测试录屏 ----
+video/
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---- 调试 / 临时 ----
+debug/
+tmp/
+*.tmp

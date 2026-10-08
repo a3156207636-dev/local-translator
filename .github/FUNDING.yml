@@ -1,0 +1,9 @@
+# GitHub Sponsors 配置
+# 把 github 下面的占位用户名换成你自己的 GitHub 账号（启用 Sponsors 后才会显示「Sponsor」按钮）
+github: ["your-github-username"]
+
+# 自定义赞助链接：直接把「商业授权 / 预编译包」的 Gumroad 页面作为赞助入口
+custom:
+  - "https://howler77886.gumroad.com/l/local-bilingual-translator-max"
+  - "https://howler77886.gumroad.com/l/local-bilingual-translator-pro"
+  - "https://ko-fi.com/your-kofi-id"
