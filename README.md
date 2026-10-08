@@ -1,4 +1,78 @@
-# 本地双语翻译（悬浮窗）
+# Local Bilingual Translator · 本地双语翻译（悬浮窗）
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue.svg)](#)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](#)
+[![Offline](https://img.shields.io/badge/100%25-offline-brightgreen.svg)](#)
+[![Ollama](https://img.shields.io/badge/Ollama-compatible-orange.svg)](https://ollama.com)
+
+**English** · [中文文档](#中文文档)
+
+---
+
+## English
+
+**Local Bilingual Translator** is a free, open-source Windows desktop app that shows a live translation in a floating overlay next to your cursor — as you type, in any application, with no internet connection involved.
+
+Type in Chinese and a small panel appears beside the caret with the English equivalent. Your original text is never touched: you still write and send Chinese, you simply see the English phrasing while you compose. Source language is auto-detected, and any two of 14+ languages can be paired (Chinese, English, Japanese, Korean, French, German, Spanish, Portuguese, Russian, Italian, Arabic, Thai, Vietnamese, Indonesian).
+
+**The whole pipeline runs on your own machine.** Translation requests go to `127.0.0.1` and nowhere else — no cloud API, no telemetry, no content filtering, no rate limits, and it keeps working with the network unplugged. It talks to any OpenAI-compatible local backend: Ollama by default, or LM Studio, llama.cpp, vLLM, OneAPI.
+
+**Latency is the whole point.** The overlay appears on the very first keystroke in about **55 ms** — before the translation even exists — then streams the result character by character: first token in **20–25 ms**, full sentence in **150–180 ms** on a 7B model. The window uses `WS_EX_NOACTIVATE`, so it never steals focus and never interrupts your IME.
+
+It is licensed under **AGPLv3 with no feature limits**: unlimited translations, any language pair, any model size, autostart — all free. A prebuilt portable build (bundled Python runtime, no install) is available on [Gumroad](https://howler77886.gumroad.com/l/local-bilingual-translator), and commercial licensing for closed-source redistribution is described in [`COMMERCIAL.md`](./COMMERCIAL.md).
+
+### Demo
+
+<!-- TODO: record a short GIF and drop it in assets/demo.gif, then uncomment the line below.
+     ScreenToGif (free, Windows) is the quickest way: record ~10 s of typing, save as assets/demo.gif.
+![Typing in Chinese, English translation appears in a floating overlay](assets/demo.gif)
+-->
+
+_A 10-second screen recording belongs here. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you'd like to help._
+
+### Features
+
+- **Instant overlay** — pops up on the first keystroke (~55 ms), not after the translation finishes
+- **Streaming output** — first translated character in 20–25 ms, full sentence in 150–180 ms
+- **Stays until dismissed** — close it with `×` or `Esc`; typing never hides it
+- **100% offline** — runs on your own GPU via Ollama; no quotas, bans or content moderation
+- **Never steals focus** — `WS_EX_NOACTIVATE` keeps your caret and IME untouched
+- **Any OpenAI-compatible backend** — Ollama, LM Studio, llama.cpp, vLLM, OneAPI
+- **Auto-starts with Windows** and waits in the system tray as a small status orb
+- **Manual hotkey** — `Ctrl+Alt+T` translates the current selection (configurable)
+- **Auto-detects the source language**, 14+ languages, any pair
+- **AGPLv3, no limits** — unlimited usage, no account, no paywall
+
+### Quick start
+
+```bash
+git clone https://github.com/a3156207636-dev/local-translator.git
+cd local-translator
+install.bat          # creates .venv and installs dependencies
+start.bat            # or: .venv\Scripts\python.exe main.py
+```
+
+On first launch a setup wizard detects your GPU/RAM, recommends a model size (7B with a discrete GPU, 3B/1.5B on integrated graphics), and can download and install Ollama plus the model for you. Alternatively, point it at any OpenAI-compatible online API if you'd rather not run a local model.
+
+**Requirements:** Windows 10/11 · Python 3.10+ with tkinter · a local LLM backend (Ollama recommended, ~700 MB + a 1.5–7B model).
+
+Prefer not to install anything? Grab the [prebuilt portable build](https://howler77886.gumroad.com/l/local-bilingual-translator) — unzip and double-click `启动.bat`, no Python needed.
+
+### Privacy
+
+- Requests go only to the endpoint you configure (default `127.0.0.1:11434`), and the app **bypasses any system proxy** on purpose
+- No telemetry, no analytics, no third-party scripts
+- The only network access is `pip` during installation
+- Translations are cached in memory only (LRU, 300 entries), never written to disk
+
+### Full documentation
+
+The complete guide — every setting, troubleshooting, and how it works internally — is in the Chinese section below. It is detailed enough to follow with any translator, and code identifiers, paths and CLI flags are language-neutral.
+
+---
+
+## 中文文档
 
 > 🆓 **免费 & 开源（AGPLv3）** · 个人 / 非商用完全免费，源码就在本仓库。
 > 支持**任意两种语言互译**（中 / 英 / 日 / 韩 / 法 / 德 / 西 / 葡 / 俄 / 意 / 阿 / 泰 / 越 / 印尼，源语言可自动检测）。
