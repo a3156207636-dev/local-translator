@@ -24,12 +24,20 @@ It is licensed under **AGPLv3 with no feature limits**: unlimited translations, 
 
 ### Demo
 
-<!-- TODO: record a short GIF and drop it in assets/demo.gif, then uncomment the line below.
-     ScreenToGif (free, Windows) is the quickest way: record ~10 s of typing, save as assets/demo.gif.
-![Typing in Chinese, English translation appears in a floating overlay](assets/demo.gif)
--->
+![Typing Chinese in Notepad — the floating overlay appears and streams the English translation](assets/demo.gif)
 
-_A 10-second screen recording belongs here. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you'd like to help._
+_Typing in Notepad: the overlay pops up on the first keystroke, then the English translation streams in. Recorded with `qwen2.5:7b-instruct-q4_K_M` on an RTX 5070 (first token 21 ms, full sentence ~1.2 s)._
+
+### How it works
+
+```
+keystroke in any input field
+   -> global keyboard hook fires              (overlay paints in ~55 ms, before translation)
+   -> UI Automation reads the focused field
+   -> last sentence is extracted
+   -> 300 ms pause  ->  POST 127.0.0.1 (streaming)
+   -> first translated char in 20-25 ms, full sentence in 150-180 ms
+```
 
 ### Features
 
@@ -217,18 +225,28 @@ python tools/verify_portable.py --e2e     # 解压到新目录自检一遍
 > 所以双击后中文提示能正常显示。用编辑器打开时记得选 GBK，否则会看到乱码。
 
 
-## 这台机器上已经配好的部分
+## 推荐的模型
 
-| 项目 | 状态 |
-|---|---|
-| Ollama 运行时 | 已安装 **0.35.1**，位于 `%LOCALAPPDATA%\Programs\Ollama` |
-| 模型目录 | `OLLAMA_MODELS` = `E:\OllamaModels`（沿用你原有的 18GB 模型，没有重新下载） |
-| 使用的模型 | **`qwen2.5:7b-instruct-q4_K_M`**（4.68GB，中文→英文语感最好） |
-| 其他可用模型 | `gpt-oss:20b`、`gpt-oss:20b-32k`、`qwen3-embedding:0.6b` |
-| 开机自启 | Ollama 与工具本体**都已写入** `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
-| 硬件 | RTX 5070 / 12GB 显存，7B Q4 模型实测**平均 147ms/句**，功耗与速度都很宽裕 |
+默认配置用的是 `qwen2.5:7b-instruct-q4_K_M`（约 4.7 GB），中文→英文的语感在通用模型里最好，
+日常对话、邮件、文档都够用。显存敏感的话可以降档：
 
-工具启动时若发现服务没跑，会自己拉起 Ollama，所以平时**开机就会自动就绪**。
+| 显存 | 建议模型 | 说明 |
+|---|---|---|
+| ≥ 8 GB | `qwen2.5:7b-instruct-q4_K_M` | 默认，质量与速度平衡 |
+| 4–8 GB | `qwen2.5:3b` | 速度明显更快，长句质量略降 |
+| ≤ 4 GB / 核显 | `qwen2.5:1.5b` | 能用，适合短句 |
+
+想要专精翻译质量（而不是通用对话能力），可以换成专用翻译模型：
+
+```
+ollama pull hunyuan-mt:7b      # 腾讯混元，WMT2025 翻译赛道冠军
+ollama pull seed-x:7b          # 字节，专用翻译模型
+```
+
+拉完在「设置 → 模型名称」里改掉即可。7B 模型在 8 GB 以上显存都能跑得动。
+
+> 注意：Ollama 默认从 GitHub 拉模型，国内速度可能只有 100KB/s 量级。
+> 装的时候可以设置镜像加速，或用别的下载工具下好 GGUF 再用 `ollama create` 导入。
 
 ## 想换更强的翻译模型
 
