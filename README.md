@@ -5,7 +5,7 @@
 >
 > - 想省事？[下载预编译便携版](https://howler77886.gumroad.com/l/local-bilingual-translator)（解压即用，自带 Python 运行时，无需装环境）
 > - 企业 / 商用 / 闭源分发需要[商业授权](https://howler77886.gumroad.com/l/local-bilingual-translator-max)（Gumroad 上的 Pro / Max 即为商业授权 + 优先支持）
-> - 喜欢这个项目？[GitHub Sponsors](https://github.com/sponsors/a3156207636-dev) 赞助一下 ❤️
+> - 喜欢这个项目？[Open Collective](https://opencollective.com/local-translator) 赞助一下 ❤️
 > - 商业授权细则见 [`COMMERCIAL.md`](./COMMERCIAL.md)
 
 打中文的时候，旁边一个悬浮窗同步显示英文对照。原文不变、发出去的还是中文，
@@ -350,5 +350,20 @@ AGPLv3 是强 copyleft：如果你**修改并分发**（含以网络服务形式
 
 > 所有档位下载的是**同一份预编译便携包**，功能完全一致；购买商业授权仅附带密钥标记、便携包与优先支持，**升级无需重装**。
 
-如果本项目对你有用，欢迎在 [GitHub Sponsors](https://github.com/sponsors/a3156207636-dev)
-上赞助，或直接在上面的 Gumroad 页面付费支持 —— 这能让我持续维护与改进它。🙏
+如果本项目对你有用，欢迎通过 [Open Collective](https://opencollective.com/local-translator)
+赞助，或直接在上面的 Gumroad 页面付费支持 —— 这能让我持续维护与改进它。🙏
+（GitHub Sponsors 在本账号所在地区暂不可用，故改用 Open Collective 收款。）
+
+---
+
+## 💖 支持这个项目（Support This Project）
+
+如果这个工具帮到了你，欢迎赞助，让我能持续维护与改进它：
+
+[![Open Collective](https://img.shields.io/badge/Sponsor-Open%20Collective-%237FADF2?logo=opencollective)](https://opencollective.com/local-translator)
+
+- **Open Collective**：[opencollective.com/local-translator](https://opencollective.com/local-translator)
+  （GitHub Sponsors 在本账号所在地区暂不可用，因此改用 Open Collective 收款，同样支持国际汇款到中国银行账户）
+- **商业授权 / 预编译便携包**：见上方「许可证与商业授权」里的 Gumroad 链接（Pro / Max 即为商业授权 + 优先支持）
+
+每一份赞助都会直接用于模型适配、新功能开发与问题修复。谢谢你的支持！🙏

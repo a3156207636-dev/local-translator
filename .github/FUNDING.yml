@@ -1,7 +1,7 @@
-# GitHub Sponsors 配置（启用 Sponsors 后才会显示「Sponsor」按钮）
-github: ["a3156207636-dev"]
+# Open Collective 作为赞助入口（GitHub Sponsors 在本账号所在地区暂不可用）
+open_collective: local-translator
 
-# 自定义赞助链接：直接把「商业授权 / 预编译包」的 Gumroad 页面作为赞助入口
+# 自定义赞助链接：商业授权 / 预编译便携包（Gumroad）
 custom:
   - "https://howler77886.gumroad.com/l/local-bilingual-translator-max"
   - "https://howler77886.gumroad.com/l/local-bilingual-translator-pro"
