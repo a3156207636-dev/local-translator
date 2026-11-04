@@ -168,6 +168,11 @@ def extract_unit(text: str, mode: str = "last_sentence", tail_chars: int = 200,
 # --------------------------------------------------------------------------- #
 # 剪贴板
 # --------------------------------------------------------------------------- #
+def fix_surrogates(text: str) -> str:
+    """把拆开的 UTF-16 代理对合回 emoji，丢弃落单的；否则编码成 UTF-8 发请求时会报错。"""
+    return text.encode("utf-16", "surrogatepass").decode("utf-16", "ignore")
+
+
 def get_clipboard() -> str:
     try:
         import pyperclip

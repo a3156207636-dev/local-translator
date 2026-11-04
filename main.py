@@ -374,6 +374,7 @@ class App:
         return True
 
     def _dispatch(self, text: str, caret, prefix: str = "") -> None:
+        text = ctxmod.fix_surrogates(text)
         trig = self.cfg.get("trigger", {})
         if len(text) < int(trig.get("min_chars", 2)):
             return
