@@ -136,21 +136,20 @@ class FloatingUI:
         self.dst_label.pack(fill="x")
 
         self.footer = tk.Frame(body, bg="#FFFFFF")
-        self.footer.pack(fill="x", pady=(10, 0))
 
         self.meta = tk.Label(self.footer, text="", font=self.meta_font,
                              fg="#9AA3AB", bg="#FFFFFF", anchor="w")
-        self.meta.pack(side="left")
 
+        # 按钮先排，宽度不够时只裁剪状态文字
         self.btn_close = self._mk_button(self.footer, "×", lambda: self.hide_overlay(user=True))
         self.btn_close.pack(side="right")
         self.btn_pin = self._mk_button(self.footer, "固定", self._toggle_pin)
         self.btn_pin.pack(side="right", padx=(0, 6))
         self.btn_copy = self._mk_button(self.footer, "复制", self._copy)
         self.btn_copy.pack(side="right", padx=(0, 6))
+        self.meta.pack(side="left")
 
-        if not ov.get("show_footer", True):
-            self.footer.pack_forget()
+        self._sync_sections(ov)
 
         for widget in (card, body, self.hdr, self.src_label, self.dst_label,
                        self.sep, self.footer, self.meta, outer):
@@ -158,6 +157,26 @@ class FloatingUI:
             widget.bind("<B1-Motion>", self._drag_move)
 
         w.bind("<Escape>", lambda _e: self.hide_overlay(user=True))
+
+    def _sync_sections(self, ov: dict) -> None:
+        """让原文区、底部栏的显隐与配置一致；关掉后再打开也能恢复。"""
+        if ov.get("show_source", True):
+            if not self.hdr.winfo_manager():
+                self.hdr.pack(fill="x", before=self.dst_label)
+                self.src_label.pack(fill="x", pady=(2, 0), before=self.dst_label)
+                self.sep.pack(fill="x", pady=8, before=self.dst_label)
+        else:
+            self.hdr.pack_forget()
+            self.src_label.pack_forget()
+            self.sep.pack_forget()
+
+        if ov.get("show_footer", True):
+            if not self.footer.winfo_manager():
+                # 最先排入并贴底：流式译文变长时被裁剪的是译文，不是按钮
+                self.footer.pack(side="bottom", fill="x", pady=(10, 0),
+                                 before=self.body.pack_slaves()[0])
+        else:
+            self.footer.pack_forget()
 
     def _mk_button(self, parent: tk.Misc, text: str, cmd: Callable[[], None]) -> tk.Label:
         lb = tk.Label(parent, text=text, font=self.meta_font, fg="#6B7680",
@@ -302,6 +321,7 @@ class FloatingUI:
             h = max(70, int(self.win.winfo_reqheight()))
         except Exception:
             h = 120
+        h = min(h, sh - 16)
         x = max(8, min(x, sw - w - 8))
         if y + h > sh - 8:
             y = max(8, (caret[1] - h - 10) if caret else (sh - h - 60))
@@ -321,11 +341,7 @@ class FloatingUI:
         error: str = "",
         first_ms: int = 0,
     ) -> None:
-        ov = self.cfg.get("overlay", {})
-        if not ov.get("show_source", True):
-            self.hdr.pack_forget()
-            self.src_label.pack_forget()
-            self.sep.pack_forget()
+        self._sync_sections(self.cfg.get("overlay", {}))
 
         if pending:
             self.hdr.configure(text="原文", fg="#8A9199")
@@ -540,7 +556,13 @@ class FloatingUI:
             self.accent = ov.get("accent", self.accent)
         except Exception:
             pass
-        show_pill = bool(cfg.get("app", {}).get("show_pill", True))
+        self._sync_sections(ov)
+        if self.win.state() == "normal":
+            # 窗口大小是显式设定的，不会随内容变化，要手动贴合新的内容高度
+            self.win.update_idletasks()
+            h = min(self.win.winfo_reqheight(), self.win.winfo_screenheight() - 16)
+            self.win.geometry(f"{self.win.winfo_width()}x{h}")
+        show_pill =bool(cfg.get("app", {}).get("show_pill", True))
         try:
             if show_pill:
                 self.pill.deiconify()
