@@ -111,6 +111,13 @@ def main() -> int:
         ui.root.update()
         expect("最长高度：不超过设定", ui.win.winfo_height() <= round(200 * ui.scale), str(ui.win.winfo_height()))
         cfg["overlay"]["max_height"] = 0
+
+        ui.root.update()
+        wide = ui.win.winfo_width() + 100
+        cfg["overlay"]["width"] = round(wide / ui.scale)
+        ui.apply_live(cfg)
+        ui.root.update()
+        expect("固定时改宽度：立即生效", abs(ui.win.winfo_width() - wide) <= 1, f"{ui.win.winfo_width()} 要 {wide}")
         ui._toggle_pin()
         ui.post(("quit",))
 

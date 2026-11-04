@@ -369,9 +369,10 @@ class FloatingUI:
     def _place(self, caret: Optional[tuple[int, int, int, int]]) -> None:
         if self._pinned and self._pin_pos:
             x, y = self._pin_pos
-            _left, top, _right, bottom = _work_area(x, y)
+            _left, _top, right, bottom = _work_area(x, y)
+            w = min(self.width, right - x - 8)
             h = self._fit_height(y, bottom - 8)
-            self.win.geometry(f"{self.win.winfo_width()}x{h}+{x}+{y}")
+            self.win.geometry(f"{w}x{h}+{x}+{y}")
             return
 
         ov = self.cfg.get("overlay", {})
@@ -646,9 +647,11 @@ class FloatingUI:
         self._sync_sections(ov)
         if self.win.state() == "normal":
             # 窗口大小是显式设定的，不会随内容变化，要手动贴合新的内容高度
-            y = self.win.winfo_y()
-            h = self._fit_height(y, _work_area(self.win.winfo_x(), y)[3] - 8)
-            self.win.geometry(f"{self.win.winfo_width()}x{h}")
+            x, y = self.win.winfo_x(), self.win.winfo_y()
+            _left, _top, right, bottom = _work_area(x, y)
+            w = min(self.width, right - x - 8)
+            h = self._fit_height(y, bottom - 8)
+            self.win.geometry(f"{w}x{h}")
         show_pill =bool(cfg.get("app", {}).get("show_pill", True))
         try:
             if show_pill:
