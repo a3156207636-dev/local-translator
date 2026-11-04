@@ -84,7 +84,8 @@ class SettingsWindow:
         self.win = win
         win.title("本地双语翻译 · 设置")
         win.configure(bg="#F4F6F8")
-        win.geometry("620x720")
+        self.scale = self.parent.winfo_fpixels("1i") / 96
+        win.geometry(f"{round(620 * self.scale)}x{round(720 * self.scale)}")
         win.protocol("WM_DELETE_WINDOW", self._close)
 
         head = tk.Frame(win, bg="#F4F6F8")
@@ -103,7 +104,7 @@ class SettingsWindow:
         inner = tk.Frame(canvas, bg="#F4F6F8")
         inner.bind("<Configure>",
                    lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=inner, anchor="nw", width=560)
+        canvas.create_window((0, 0), window=inner, anchor="nw", width=round(560 * self.scale))
         canvas.configure(yscrollcommand=sb.set)
         canvas.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
@@ -176,7 +177,7 @@ class SettingsWindow:
 
         self.lic_hint = tk.Label(wrap, text="", font=(self.font_family, 9),
                                  bg="#EAF1FA", fg="#6B7680", justify="left",
-                                 wraplength=520, anchor="w")
+                                 wraplength=round(520 * self.scale), anchor="w")
         self.lic_hint.pack(fill="x", padx=12, pady=(4, 0))
 
         self.lic_link = tk.Label(wrap, text="购买商业授权 / 支持开发 →",
@@ -315,7 +316,7 @@ class SettingsWindow:
 
         self.lang_lock = tk.Label(wrap, text="开源版 · 任意语言对均可互译",
                                   font=(self.font_family, 9),
-                                  bg="#F4F6F8", fg="#2E7D32", wraplength=200)
+                                  bg="#F4F6F8", fg="#2E7D32", wraplength=round(200 * self.scale))
         self.lang_lock.pack(side="left", padx=(10, 0))
 
         # 已无档位锁定，无需再放「升级」链接
@@ -402,7 +403,7 @@ class SettingsWindow:
         dlg = tk.Toplevel(self.win)
         dlg.title("本机可用翻译服务")
         dlg.configure(bg="#F4F6F8")
-        dlg.geometry("520x340")
+        dlg.geometry(f"{round(520 * self.scale)}x{round(340 * self.scale)}")
         tk.Label(dlg, text="选中一项后点「使用」，会自动填好地址与模型",
                  font=(self.font_family, 9), bg="#F4F6F8", fg="#6B7680").pack(
             anchor="w", padx=14, pady=(12, 6))

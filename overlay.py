@@ -74,7 +74,9 @@ class FloatingUI:
 
         ov = cfg.get("overlay", {})
         self.font_family = ov.get("font_family", "Microsoft YaHei UI")
-        self.width = int(ov.get("width", 480))
+        # 配置里的尺寸按 100% 缩放计，换算成当前屏幕的实际像素
+        self.scale = self.root.winfo_fpixels("1i") / 96
+        self.width = round(int(ov.get("width", 480)) * self.scale)
         self.accent = ov.get("accent", "#185FA5")
 
         self._build_overlay()
@@ -224,7 +226,7 @@ class FloatingUI:
         self.menu.add_separator()
         self.menu.add_command(label="退出", command=lambda: self.on_quit())
 
-        w, h = 96, 28
+        w, h = round(96 * self.scale), round(28 * self.scale)
         sw = p.winfo_screenwidth()
         sh = p.winfo_screenheight()
         p.geometry(f"{w}x{h}+{sw - w - 24}+{sh - h - 120}")
@@ -546,7 +548,8 @@ class FloatingUI:
         """配置改动后尽量不动窗口地热更新外观。"""
         ov = cfg.get("overlay", {})
         try:
-            self.width = int(ov.get("width", self.width))
+            if "width" in ov:
+                self.width = round(int(ov["width"]) * self.scale)
             inner = self.width - 40
             for lb in (self.src_label, self.dst_label):
                 lb.configure(wraplength=inner)
