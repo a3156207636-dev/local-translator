@@ -38,6 +38,7 @@ SPEC: list[tuple[str, str, str, Any]] = [
     ("__section__", "悬浮窗外观", "", None),
     ("overlay.position", "出现位置", "combo", ["follow_caret", "follow_mouse", "fixed"]),
     ("overlay.width", "宽度（像素）", "int", None),
+    ("overlay.max_height", "最长高度（像素，0=到屏幕边缘）", "int", None),
     ("overlay.opacity", "不透明度", "float", None),
     ("overlay.font_family", "字体", "text", None),
     ("overlay.src_font_size", "原文字号", "int", None),

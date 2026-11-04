@@ -21,6 +21,7 @@ GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE = 0x08000000
 WS_EX_TOOLWINDOW = 0x00000080
 SW_SHOWNOACTIVATE = 4
+MONITOR_DEFAULTTONEAREST = 2
 
 
 def _apply_no_activate(win: tk.Misc) -> None:
@@ -37,6 +38,24 @@ def _apply_no_activate(win: tk.Misc) -> None:
         )
     except Exception:
         pass
+
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+
+def _work_area(x: int, y: int) -> tuple[int, int, int, int]:
+    """(x, y) 所在显示器的可用区域（不含任务栏）：左、上、右、下。"""
+    u32 = ctypes.windll.user32
+    u32.MonitorFromPoint.restype = ctypes.c_void_p
+    u32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
+    u32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.POINTER(_MonitorInfo)]
+    info = _MonitorInfo(cbSize=ctypes.sizeof(_MonitorInfo))
+    u32.GetMonitorInfoW(u32.MonitorFromPoint(wintypes.POINT(x, y), MONITOR_DEFAULTTONEAREST),
+                        ctypes.byref(info))
+    r = info.rcWork
+    return r.left, r.top, r.right, r.bottom
 
 
 class FloatingUI:
@@ -61,6 +80,7 @@ class FloatingUI:
         self.q: queue.Queue[tuple] = queue.Queue()      # 外部线程 → 界面
         self.out_q: queue.Queue[tuple] = queue.Queue()  # 界面 → 外部线程（菜单动作等）
         self._pinned = False
+        self._pin_pos: Optional[tuple[int, int]] = None
         self._hide_job: Optional[str] = None
         self._last_payload: dict[str, Any] = {}
         self._last_render: dict[str, Any] = {}
@@ -118,21 +138,37 @@ class FloatingUI:
         self.meta_font = tkfont.Font(family=self.font_family, size=9)
         self.hdr_font = tkfont.Font(family=self.font_family, size=9, weight="bold")
 
-        self.hdr = tk.Label(body, text="原文", font=self.hdr_font, fg="#8A9199",
+        # 内容放进可滚动的视口：窗口放不下时用滚轮查看，按钮始终留在底部
+        self.viewport = tk.Canvas(
+            body, bg="#FFFFFF", highlightthickness=0, bd=0, width=inner, height=1,
+            yscrollincrement=self.dst_font.metrics("linespace"),
+            yscrollcommand=self._on_scroll,
+        )
+        self.viewport.pack(fill="both", expand=True)
+        self.content = tk.Frame(self.viewport, bg="#FFFFFF")
+        content_id = self.viewport.create_window((0, 0), window=self.content, anchor="nw")
+        self.viewport.bind(
+            "<Configure>", lambda e: self.viewport.itemconfigure(content_id, width=e.width)
+        )
+        self.content.bind("<Configure>", lambda _e: self._sync_scrollregion())
+        self.thumb = tk.Frame(self.viewport, bg="#C4CAD0", width=round(3 * self.scale))
+        self._follow_stream = True
+
+        self.hdr = tk.Label(self.content, text="原文", font=self.hdr_font, fg="#8A9199",
                             bg="#FFFFFF", anchor="w")
         self.hdr.pack(fill="x")
 
         self.src_label = tk.Label(
-            body, text="", font=self.src_font, fg="#5F6B76", bg="#FFFFFF",
+            self.content, text="", font=self.src_font, fg="#5F6B76", bg="#FFFFFF",
             anchor="w", justify="left", wraplength=inner,
         )
         self.src_label.pack(fill="x", pady=(2, 0))
 
-        self.sep = tk.Frame(body, bg="#EDEFF2", height=1)
+        self.sep = tk.Frame(self.content, bg="#EDEFF2", height=1)
         self.sep.pack(fill="x", pady=8)
 
         self.dst_label = tk.Label(
-            body, text="", font=self.dst_font, fg="#1F2933", bg="#FFFFFF",
+            self.content, text="", font=self.dst_font, fg="#1F2933", bg="#FFFFFF",
             anchor="w", justify="left", wraplength=inner,
         )
         self.dst_label.pack(fill="x")
@@ -153,12 +189,13 @@ class FloatingUI:
 
         self._sync_sections(ov)
 
-        for widget in (card, body, self.hdr, self.src_label, self.dst_label,
-                       self.sep, self.footer, self.meta, outer):
+        for widget in (card, body, self.viewport, self.content, self.thumb, self.hdr,
+                       self.src_label, self.dst_label, self.sep, self.footer, self.meta, outer):
             widget.bind("<Button-1>", self._drag_start)
             widget.bind("<B1-Motion>", self._drag_move)
 
         w.bind("<Escape>", lambda _e: self.hide_overlay(user=True))
+        w.bind("<MouseWheel>", self._on_wheel)
 
     def _sync_sections(self, ov: dict) -> None:
         """让原文区、底部栏的显隐与配置一致；关掉后再打开也能恢复。"""
@@ -174,9 +211,9 @@ class FloatingUI:
 
         if ov.get("show_footer", True):
             if not self.footer.winfo_manager():
-                # 最先排入并贴底：流式译文变长时被裁剪的是译文，不是按钮
+                # 排在视口之前并贴底：窗口变矮时被压缩的是内容，不是按钮
                 self.footer.pack(side="bottom", fill="x", pady=(10, 0),
-                                 before=self.body.pack_slaves()[0])
+                                 before=self.viewport)
         else:
             self.footer.pack_forget()
 
@@ -243,7 +280,37 @@ class FloatingUI:
 
     def _drag_move(self, e: tk.Event) -> None:
         dx, dy = getattr(self, "_drag", (0, 0))
-        self.win.geometry(f"+{e.x_root - dx}+{e.y_root - dy}")
+        left, top, right, bottom = _work_area(e.x_root, e.y_root)
+        x = max(left + 8, min(e.x_root - dx, right - self.win.winfo_width() - 8))
+        y = max(top + 8, min(e.y_root - dy, bottom - 8 - round(90 * self.scale)))
+        # 离屏幕边缘的空间变了，高度跟着展开或收起
+        h = self._fit_height(y, bottom - 8)
+        self.win.geometry(f"{self.win.winfo_width()}x{h}+{x}+{y}")
+        if self._pinned:
+            self._pin_pos = (x, y)
+
+    # ------------------------------------------------------------------ #
+    # 滚动
+    # ------------------------------------------------------------------ #
+    def _sync_scrollregion(self) -> None:
+        self.viewport.update_idletasks()
+        self.viewport.configure(scrollregion=(
+            0, 0, self.viewport.winfo_width(), self.content.winfo_reqheight(),
+        ))
+
+    def _on_scroll(self, first: str, last: str) -> None:
+        """滚动条细条：只在内容放不下时出现。"""
+        start, end = float(first), float(last)
+        if start <= 0 and end >= 1:
+            self.thumb.place_forget()
+        else:
+            self.thumb.place(relx=1.0, anchor="ne", rely=start, relheight=end - start)
+
+    def _on_wheel(self, e: tk.Event) -> str:
+        if self.content.winfo_reqheight() > self.viewport.winfo_height():
+            self.viewport.yview_scroll(-1 if e.delta > 0 else 1, "units")
+            self._follow_stream = False  # 用户在看别处，流式更新不再把视图拉回末尾
+        return "break"  # 不再传给设置窗口的全局滚轮绑定
 
     def _pill_drag_start(self, e: tk.Event) -> None:
         self._pill_drag = (e.x_root - self.pill.winfo_x(), e.y_root - self.pill.winfo_y())
@@ -288,12 +355,27 @@ class FloatingUI:
     # ------------------------------------------------------------------ #
     # 定位
     # ------------------------------------------------------------------ #
+    def _fit_height(self, y: int, bottom: int) -> int:
+        """从 y 开始往下能用的窗口高度：贴合内容，但不超过配置上限和屏幕边缘。"""
+        self.win.update_idletasks()
+        self.viewport.configure(height=max(1, self.content.winfo_reqheight()))
+        self.win.update_idletasks()
+        h = max(70, self.win.winfo_reqheight())
+        limit = round(int(self.cfg.get("overlay", {}).get("max_height", 0)) * self.scale)
+        if limit > 0:
+            h = min(h, limit)
+        return min(h, bottom - y)
+
     def _place(self, caret: Optional[tuple[int, int, int, int]]) -> None:
+        if self._pinned and self._pin_pos:
+            x, y = self._pin_pos
+            _left, top, _right, bottom = _work_area(x, y)
+            h = self._fit_height(y, bottom - 8)
+            self.win.geometry(f"{self.win.winfo_width()}x{h}+{x}+{y}")
+            return
+
         ov = self.cfg.get("overlay", {})
         mode = ov.get("position", "follow_caret")
-        self.win.update_idletasks()
-        w = self.win.winfo_width() or self.width
-        h = self.win.winfo_height() or 120
 
         if mode == "fixed":
             x, y = int(ov.get("fixed_x", 1200)), int(ov.get("fixed_y", 240))
@@ -315,18 +397,13 @@ class FloatingUI:
                 except Exception:
                     x, y = 400, 300
 
-        sw = self.win.winfo_screenwidth()
-        sh = self.win.winfo_screenheight()
+        left, top, right, bottom = _work_area(x, y)
         # 固定宽度，避免刚弹出（原文还空着）时窗口很窄、内容到了又猛地变宽
-        w = max(240, min(int(self.width), sw - 16))
-        try:
-            h = max(70, int(self.win.winfo_reqheight()))
-        except Exception:
-            h = 120
-        h = min(h, sh - 16)
-        x = max(8, min(x, sw - w - 8))
-        if y + h > sh - 8:
-            y = max(8, (caret[1] - h - 10) if caret else (sh - h - 60))
+        w = max(240, min(int(self.width), right - left - 16))
+        h = self._fit_height(top + 8, bottom - 8)
+        x = max(left + 8, min(x, right - w - 8))
+        if y + h > bottom - 8:
+            y = max(top + 8, (caret[1] - h - 10) if caret else (bottom - h - 60))
         self.win.geometry(f"{w}x{h}+{int(x)}+{int(y)}")
 
     # ------------------------------------------------------------------ #
@@ -367,7 +444,10 @@ class FloatingUI:
             "elapsed_ms": elapsed_ms, "error": error, "first_ms": first_ms,
         }
         self._user_closed = False
+        self._follow_stream = True
         self._reveal(caret)
+        self._sync_scrollregion()
+        self.viewport.yview_moveto(0)
         if not pending and not self._pinned and not error:
             self._start_hide()
 
@@ -441,6 +521,9 @@ class FloatingUI:
                 self.src_label.configure(text=src)
             self.dst_label.configure(text=dst or "…", fg="#1F2933")
             self._last_payload = {"src": src, "dst": dst}
+            self._sync_scrollregion()
+            if self._follow_stream:
+                self.viewport.yview_moveto(1)
         except Exception:
             pass
         if not self._shown_once:
@@ -468,6 +551,7 @@ class FloatingUI:
         self._pinned = not self._pinned
         self.btn_pin.configure(text="已固定" if self._pinned else "固定",
                                bg="#D6E9DA" if self._pinned else "#F2F4F6")
+        self._pin_pos = (self.win.winfo_x(), self.win.winfo_y()) if self._pinned else None
         if self._pinned:
             self._cancel_hide()
         else:
@@ -562,8 +646,8 @@ class FloatingUI:
         self._sync_sections(ov)
         if self.win.state() == "normal":
             # 窗口大小是显式设定的，不会随内容变化，要手动贴合新的内容高度
-            self.win.update_idletasks()
-            h = min(self.win.winfo_reqheight(), self.win.winfo_screenheight() - 16)
+            y = self.win.winfo_y()
+            h = self._fit_height(y, _work_area(self.win.winfo_x(), y)[3] - 8)
             self.win.geometry(f"{self.win.winfo_width()}x{h}")
         show_pill =bool(cfg.get("app", {}).get("show_pill", True))
         try:
