@@ -51,6 +51,7 @@ DEFAULTS: dict[str, Any] = {
         "fixed_x": 1200,
         "fixed_y": 240,
         "width": 480,
+        "max_height": 0,             # 窗口最长高度；0 = 可一直展开到屏幕边缘
         "opacity": 0.97,
         "font_family": "Microsoft YaHei UI",
         "src_font_size": 11,

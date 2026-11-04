@@ -374,6 +374,7 @@ class App:
         return True
 
     def _dispatch(self, text: str, caret, prefix: str = "") -> None:
+        text = ctxmod.fix_surrogates(text)
         trig = self.cfg.get("trigger", {})
         if len(text) < int(trig.get("min_chars", 2)):
             return
@@ -659,6 +660,8 @@ def main() -> int:
         log.info("桌面%s，开始启动", "已就绪" if ready else "等待超时")
 
     log.info("启动；配置文件 %s", cfgmod.CONFIG_PATH)
+    # 必须在创建 Tk 窗口之前：否则高分屏下整个界面被系统放大，文字发糊
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
     App(cfg, log).start()
     return 0
 
