@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -43,71 +44,31 @@ CREATE_NEW_PROCESS_GROUP = 0x00000200
 
 # --------------------------------------------------------------------------- #
 def list_instances() -> list[int]:
-    """找出所有在跑本工具的 pythonw 进程。"""
-    try:
-        import pythoncom
-        import win32com.client
-
-        pythoncom.CoInitialize()
-        svc = win32com.client.Dispatch(
-            "WbemScripting.SWbemLocator"
-        ).ConnectServer(".", "root\\cimv2")
-        rows = svc.ExecQuery(
-            "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='pythonw.exe'"
-        )
-    except Exception:
-        return _fallback_list()
-
+    """找出所有在跑本工具的 pythonw 进程。查询失败时抛异常，由 main 报错。"""
+    query = (
+        "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
+        "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe'\""
+        " | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"
+    )
+    r = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", query],
+        capture_output=True, encoding="utf-8", timeout=30, check=True,
+    )
+    rows = json.loads(r.stdout) if r.stdout.strip() else []
+    if isinstance(rows, dict):  # 只有一个进程时 ConvertTo-Json 输出单个对象
+        rows = [rows]
     target = str(APP_DIR).lower()
-    pids: list[int] = []
-    try:
-        for p in rows:
-            cl = p.CommandLine or ""
-            if "main.py" in cl and target in cl.lower():
-                pids.append(int(p.ProcessId))
-    except Exception:
-        return _fallback_list()
-    return pids
-
-
-def _fallback_list() -> list[int]:
-    """没有 pywin32 时退化成按「互斥体是否被占用」判断。"""
-    try:
-        exe = Path(sys.executable)
-        r = subprocess.run(
-            [str(exe), str(MAIN), "--running"],
-            capture_output=True, text=True, timeout=20, cwd=str(APP_DIR),
-        )
-        if r.stdout.strip().endswith("RUNNING"):
-            print("  （有实例在运行，但拿不到 PID；只能用互斥体判断）")
-            return [-1]
-    except Exception:
-        pass
-    return []
+    return [
+        int(p["ProcessId"]) for p in rows
+        if "main.py" in (p["CommandLine"] or "") and target in p["CommandLine"].lower()
+    ]
 
 
 def kill(pid: int) -> bool:
-    if pid < 0:
-        print("  无法结束：拿不到 PID。请从右下角状态球右键退出。")
-        return False
-    try:
-        import win32api
-        import win32con
-        import win32process
-
-        h = win32api.OpenProcess(win32con.PROCESS_TERMINATE, False, pid)
-        win32process.TerminateProcess(h, 0)
-        win32api.CloseHandle(h)
-        return True
-    except Exception:
-        pass
-    try:
-        return subprocess.run(
-            ["taskkill", "/PID", str(pid), "/F"],
-            capture_output=True, timeout=20,
-        ).returncode == 0
-    except Exception:
-        return False
+    return subprocess.run(
+        ["taskkill", "/PID", str(pid), "/F"],
+        capture_output=True, timeout=20,
+    ).returncode == 0
 
 
 def spawn(args: list[str]) -> None:
@@ -135,26 +96,29 @@ def main() -> int:
         print(f"找不到主程序：{MAIN}")
         return 1
 
-    old = list_instances()
-    if old:
-        print(f"正在结束旧实例：{', '.join(str(p) for p in old)}")
-        for pid in old:
-            print(f"  PID {pid} {'已结束' if kill(pid) else '结束失败'}")
-        time.sleep(1.5)
-        left = list_instances()
-        if left:
-            print(f"  ⚠ 还有实例在跑：{left}")
-    else:
-        print("没有正在运行的实例。")
-
     try:
+        old = list_instances()
+        if old:
+            print(f"正在结束旧实例：{', '.join(str(p) for p in old)}")
+            for pid in old:
+                # 一次启动有两个进程，结束一个时另一个可能已跟着退出，以下面复查为准
+                kill(pid)
+            time.sleep(1.5)
+            left = list_instances()
+            if left:
+                # 单实例互斥体还被占用，这时启动新进程只会立刻退出
+                print(f"重启失败：旧实例结束不了（PID {left}）。请从状态球右键退出后再试。")
+                return 1
+        else:
+            print("没有正在运行的实例。")
+
         spawn(["--autostart"])
+        time.sleep(2.5)
+        now = list_instances()
     except Exception as e:
-        print(f"启动失败：{type(e).__name__}: {e}")
+        print(f"重启失败：{type(e).__name__}: {e}")
         return 1
 
-    time.sleep(2.5)
-    now = list_instances()
     if now:
         print(f"已启动，PID {now}")
         print("看屏幕右下角：出现「译 · 待机」小圆球就是好了。")
